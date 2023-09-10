@@ -12,8 +12,7 @@
 #include <boost/property_tree/json_parser.hpp>
 #include <boost/property_tree/ptree.hpp>
 #include <string>
-#include <unordered_map>
-#include <unordered_set>
+#include "MyException.hpp"
 
 namespace asio = boost::asio;
 namespace ssl = asio::ssl;
@@ -22,6 +21,9 @@ namespace http = boost::beast::http;
 
 const static std::string API = "api.data.gov.sg";
 const static std::string API_PATH = "/v1/environment/air-temperature";
+
+#define TOPIC_VALUES "/api/temperature/"
+#define TOPIC_INFO "/api/status"
 
 
 
@@ -61,25 +63,27 @@ public:
         return response;
     }
 
-    static std::unordered_map<std::string, float> json_parser ( std::string& json, std::unordered_set<std::string> needed_values){
+    static std::vector<std::pair<std::string,std::string>> json_parser ( std::string& json){
         boost::property_tree::ptree pt;
         std::istringstream json_stream(json);
-        std::unordered_map<std::string, float> values;
-        try {
+        std::vector<std::pair<std::string,std::string>> values;
+
             boost::property_tree::read_json(json_stream, pt);
 
             boost::property_tree::ptree readings = pt.get_child("items").front().second.get_child("readings");
-
-            for (const auto& reading : readings) {
-                std::string station_id = reading.second.get<std::string>("station_id");
-                double value = reading.second.get<double>("value");
-                if( needed_values.find(station_id) != needed_values.end())
-                values[station_id] = value;
+            if (readings.empty()){
+                throw (MyException::ExceptionType::JSONParseError);
             }
+            for (const auto& reading : readings) {
+                auto station_id = reading.second.get<std::string>("station_id");
+                auto value = reading.second.get<std::string>("value");
+                if( station_id == "S50" || station_id == "S60" || station_id == "S107" )
+                values.emplace_back(TOPIC_VALUES +station_id,value);
+            }
+            boost::property_tree::ptree api_info = pt.get_child("api_info");
+            auto status = api_info.get<std::string>("status");
+            values.emplace_back(TOPIC_INFO,status);
             return values;
-        } catch (const std::exception& e) {
-            throw;
-        }
     }
 
 };
