@@ -68,7 +68,6 @@ public:
 
 
         int rc = mosquitto_connect(mosq, MQTT_HOST, 8885, 60);
-        std::cout << rc;
         if (rc != MOSQ_ERR_SUCCESS) {
             throw (MyException::ExceptionType::NoConnection);
         }
